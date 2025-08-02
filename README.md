@@ -6,7 +6,7 @@ A full-stack application for managing equity positions and transactions, built w
 
 ```
 equities/
-├── equities-ui/          # Angular 18 Frontend Application
+├── angular-ui/          # Angular 18 Frontend Application
 ├── java-backend/         # Spring Boot 3 Backend Application
 └── README.md
 ```
@@ -56,7 +56,7 @@ The backend will start on `http://localhost:8080`
 
 Open a new terminal and navigate to the frontend directory:
 ```bash
-cd equities-ui
+cd angular-ui
 ```
 
 Install dependencies:

@@ -1,13 +1,18 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
-import { MatTableModule } from '@angular/material/table';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { CardModule } from 'primeng/card';
+import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { TextareaModule } from 'primeng/textarea';
+import { InputNumberModule } from 'primeng/inputnumber';
+import { SelectModule } from 'primeng/select';
+import { TableModule } from 'primeng/table';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { TooltipModule } from 'primeng/tooltip';
+import { MessageModule } from 'primeng/message';
+import { ToastModule } from 'primeng/toast';
+import { MessageService } from 'primeng/api';
 import { Subscription } from 'rxjs';
 import { PositionService } from '../../services/position.service';
 import { Transaction, Position } from '../../models/transaction.model';
@@ -18,14 +23,19 @@ import { Transaction, Position } from '../../models/transaction.model';
   imports: [
     CommonModule,
     FormsModule,
-    MatCardModule,
-    MatButtonModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    MatTableModule,
-    MatProgressSpinnerModule
+    CardModule,
+    ButtonModule,
+    InputTextModule,
+    TextareaModule,
+    InputNumberModule,
+    SelectModule,
+    TableModule,
+    ProgressSpinnerModule,
+    TooltipModule,
+    MessageModule,
+    ToastModule
   ],
+  providers: [MessageService],
   templateUrl: './equity-positions.component.html',
   styleUrls: ['./equity-positions.component.scss']
 })
@@ -33,7 +43,6 @@ export class EquityPositionsComponent implements OnInit, OnDestroy {
   positions: Position[] = [];
   transactions: Transaction[] = [];
   newTransaction: Transaction = {
-    transactionId: 0,
     tradeId: 0,
     version: 1,
     securityCode: '',
@@ -45,12 +54,28 @@ export class EquityPositionsComponent implements OnInit, OnDestroy {
   isLoading = false;
   errorMessage = '';
   backendStatus = 'Unknown';
+  isEditing = false;
+  editingTransaction: Transaction | null = null;
 
-  displayedColumns: string[] = ['transactionId', 'tradeId', 'version', 'securityCode', 'quantity', 'action', 'side'];
+  displayedColumns: string[] = ['transactionId', 'tradeId', 'version', 'securityCode', 'quantity', 'action', 'side', 'actions'];
+
+  actionOptions = [
+    { label: 'INSERT', value: 'INSERT' },
+    { label: 'UPDATE', value: 'UPDATE' },
+    { label: 'CANCEL', value: 'CANCEL' }
+  ];
+
+  sideOptions = [
+    { label: 'Buy', value: 'BUY' },
+    { label: 'Sell', value: 'SELL' }
+  ];
 
   private subscriptions = new Subscription();
 
-  constructor(private positionService: PositionService) {}
+  constructor(
+    private positionService: PositionService,
+    private messageService: MessageService
+  ) {}
 
   ngOnInit(): void {
     this.subscriptions.add(
@@ -95,10 +120,20 @@ export class EquityPositionsComponent implements OnInit, OnDestroy {
       next: () => {
         this.resetForm();
         this.isLoading = false;
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Transaction added successfully'
+        });
       },
       error: (error) => {
         this.isLoading = false;
         this.errorMessage = `Error: ${error.message || 'Unknown error'}`;
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: error.message || 'Failed to add transaction'
+        });
       }
     });
   }
@@ -106,6 +141,11 @@ export class EquityPositionsComponent implements OnInit, OnDestroy {
   processBulkTransactions(): void {
     if (!this.bulkTransactionsText.trim()) {
       this.errorMessage = 'Please enter transactions.';
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Please enter transactions.'
+      });
       return;
     }
 
@@ -115,6 +155,12 @@ export class EquityPositionsComponent implements OnInit, OnDestroy {
     const transactions = this.parseBulkTransactions(this.bulkTransactionsText);
     if (transactions.length === 0) {
       this.errorMessage = 'No valid transactions found.';
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'No valid transactions found.'
+      });
+      this.isLoading = false;
       return;
     }
 
@@ -122,10 +168,20 @@ export class EquityPositionsComponent implements OnInit, OnDestroy {
       next: () => {
         this.bulkTransactionsText = '';
         this.isLoading = false;
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Success',
+          detail: `${transactions.length} transactions processed successfully`
+        });
       },
       error: (error) => {
         this.isLoading = false;
         this.errorMessage = `Error: ${error.message || 'Unknown error'}`;
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: error.message || 'Failed to process bulk transactions'
+        });
       }
     });
   }
@@ -164,9 +220,52 @@ export class EquityPositionsComponent implements OnInit, OnDestroy {
     return quantity > 0 ? `+${quantity}` : quantity.toString();
   }
 
+  editTransaction(transaction: Transaction): void {
+    this.isEditing = true;
+    this.editingTransaction = { ...transaction };
+    this.newTransaction = { ...transaction };
+  }
+
+  cancelEdit(): void {
+    this.isEditing = false;
+    this.editingTransaction = null;
+    this.resetForm();
+  }
+
+  updateTransaction(): void {
+    if (!this.validateTransaction(this.newTransaction)) {
+      return;
+    }
+
+    this.isLoading = true;
+    this.errorMessage = '';
+
+    this.positionService.processTransaction({ ...this.newTransaction }).subscribe({
+      next: () => {
+        this.isEditing = false;
+        this.editingTransaction = null;
+        this.resetForm();
+        this.isLoading = false;
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Success',
+          detail: 'Transaction updated successfully'
+        });
+      },
+      error: (error) => {
+        this.isLoading = false;
+        this.errorMessage = `Error: ${error.message || 'Unknown error'}`;
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: error.message || 'Failed to update transaction'
+        });
+      }
+    });
+  }
+
   private resetForm(): void {
     this.newTransaction = {
-      transactionId: 0,
       tradeId: 0,
       version: 1,
       securityCode: '',
@@ -177,28 +276,54 @@ export class EquityPositionsComponent implements OnInit, OnDestroy {
   }
 
   private validateTransaction(transaction: Transaction): boolean {
-    if (!transaction.transactionId || transaction.transactionId <= 0) {
+    // Transaction ID is optional for new transactions, required for updates
+    if (this.isEditing && (!transaction.transactionId || transaction.transactionId <= 0)) {
       this.errorMessage = 'Transaction ID must be a positive number.';
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Transaction ID must be a positive number.'
+      });
       return false;
     }
 
     if (!transaction.tradeId || transaction.tradeId <= 0) {
       this.errorMessage = 'Trade ID must be a positive number.';
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Trade ID must be a positive number.'
+      });
       return false;
     }
 
     if (!transaction.version || transaction.version <= 0) {
       this.errorMessage = 'Version must be a positive number.';
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Version must be a positive number.'
+      });
       return false;
     }
 
     if (!transaction.securityCode || transaction.securityCode.trim() === '') {
       this.errorMessage = 'Security code is required.';
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Security code is required.'
+      });
       return false;
     }
 
     if (!transaction.quantity || transaction.quantity <= 0) {
       this.errorMessage = 'Quantity must be a positive number.';
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Validation Error',
+        detail: 'Quantity must be a positive number.'
+      });
       return false;
     }
 
@@ -219,7 +344,7 @@ export class EquityPositionsComponent implements OnInit, OnDestroy {
 
       try {
         const transaction: Transaction = {
-          transactionId: parseInt(parts[0]),
+          transactionId: parts[0] ? parseInt(parts[0]) : undefined,
           tradeId: parseInt(parts[1]),
           version: parseInt(parts[2]),
           securityCode: parts[3],

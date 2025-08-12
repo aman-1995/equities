@@ -27,4 +27,19 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     @Query("SELECT t FROM Transaction t WHERE t.version = (SELECT MAX(t2.version) FROM Transaction t2 WHERE t2.tradeId = t.tradeId)")
     List<Transaction> findLatestTransactionsForAllTrades();
+
+    @Query("SELECT t FROM Transaction t WHERE t.id > :lastProcessedId ORDER BY t.id")
+    List<Transaction> findTransactionsAfterId(@Param("lastProcessedId") Long lastProcessedId);
+
+    @Query("SELECT MAX(t.id) FROM Transaction t")
+    Optional<Long> findMaxTransactionId();
+
+    @Query("SELECT DISTINCT t.tradeId FROM Transaction t WHERE t.securityCode IN :securityCodes ORDER BY t.tradeId")
+    List<Long> findTradeIdsBySecurityCodes(@Param("securityCodes") List<String> securityCodes);
+
+    @Query("SELECT t FROM Transaction t WHERE t.tradeId IN :tradeIds ORDER BY t.tradeId, t.version")
+    List<Transaction> findTransactionsByTradeIds(@Param("tradeIds") List<Long> tradeIds);
+
+    @Query("SELECT t FROM Transaction t ORDER BY t.tradeId, t.version")
+    List<Transaction> findAllByOrderByTradeIdAscVersionAsc();
 } 

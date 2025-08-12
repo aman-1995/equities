@@ -11,7 +11,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,7 +37,6 @@ class PositionCalculationServiceTest {
     @Test
     void testProcessSingleInsertTransaction() {
         Transaction transaction = Transaction.builder()
-                .transactionId(1L)
                 .tradeId(1L)
                 .version(1)
                 .securityCode("REL")
@@ -55,24 +53,7 @@ class PositionCalculationServiceTest {
         assertEquals(50, position.getQuantity());
     }
 
-    @Test
-    void testProcessBulkTransactionsAsync() {
-        List<Transaction> transactions = List.of(
-                Transaction.builder().transactionId(1L).tradeId(1L).version(1).securityCode("REL").quantity(50).action(Transaction.TransactionAction.INSERT).side(Transaction.TransactionSide.BUY).build(),
-                Transaction.builder().transactionId(2L).tradeId(2L).version(1).securityCode("ITC").quantity(40).action(Transaction.TransactionAction.INSERT).side(Transaction.TransactionSide.SELL).build()
-        );
 
-        CompletableFuture<List<Position>> future = positionCalculationService.processBulkTransactionsAsync(transactions);
-
-        try {
-            List<Position> result = future.get();
-            assertEquals(2, result.size());
-            assertEquals("ITC", result.get(0).getSecurityCode());
-            assertEquals("REL", result.get(1).getSecurityCode());
-        } catch (Exception e) {
-            fail("Async operation failed: " + e.getMessage());
-        }
-    }
 
     @Test
     void testLoadSampleData() {

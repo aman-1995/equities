@@ -1,6 +1,7 @@
 package com.equities.controller;
 
 import com.equities.model.Position;
+import com.equities.model.ProcessingState;
 import com.equities.model.Transaction;
 import com.equities.service.PositionCalculationService;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api")
@@ -43,11 +43,7 @@ public class PositionController {
         return ResponseEntity.ok(positions);
     }
 
-    @PostMapping("/transactions/bulk-async")
-    public ResponseEntity<CompletableFuture<List<Position>>> processBulkTransactionsAsync(@RequestBody List<Transaction> transactions) {
-        CompletableFuture<List<Position>> positions = positionCalculationService.processBulkTransactionsAsync(transactions);
-        return ResponseEntity.ok(positions);
-    }
+
 
     @PostMapping("/load-sample-data")
     public ResponseEntity<List<Position>> loadSampleData() {
@@ -66,5 +62,18 @@ public class PositionController {
     @GetMapping("/health")
     public ResponseEntity<String> healthCheck() {
         return ResponseEntity.ok("OK");
+    }
+
+    @GetMapping("/processing-state")
+    public ResponseEntity<ProcessingState> getProcessingState() {
+        ProcessingState state = positionCalculationService.getProcessingState();
+        return ResponseEntity.ok(state);
+    }
+
+    @PostMapping("/force-recalculation")
+    public ResponseEntity<List<Position>> forceFullRecalculation() {
+        log.info("Forcing full recalculation via REST API");
+        List<Position> positions = positionCalculationService.forceFullRecalculation();
+        return ResponseEntity.ok(positions);
     }
 } 

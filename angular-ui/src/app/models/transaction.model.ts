@@ -1,5 +1,5 @@
 export interface Transaction {
-  transactionId: number;
+  transactionId?: number;
   tradeId: number;
   version: number;
   securityCode: string;

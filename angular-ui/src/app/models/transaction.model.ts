@@ -6,6 +6,7 @@ export interface Transaction {
   quantity: number;
   action: 'INSERT' | 'UPDATE' | 'CANCEL';
   side: 'BUY' | 'SELL';
+  isLatestVersion?: boolean;
 }
 
 export interface Position {

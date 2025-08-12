@@ -41,6 +41,9 @@ public class Transaction {
     @Column(nullable = false)
     private TransactionSide side;
 
+    @Transient
+    private Boolean isLatestVersion;
+
     public enum TransactionAction {
         INSERT, UPDATE, CANCEL
     }

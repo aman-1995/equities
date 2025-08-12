@@ -221,9 +221,25 @@ export class EquityPositionsComponent implements OnInit, OnDestroy {
   }
 
   editTransaction(transaction: Transaction): void {
+    if (!this.isLatestTransaction(transaction)) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Cannot Edit',
+        detail: 'Only the latest transaction version for each trade can be edited.'
+      });
+      return;
+    }
+    
     this.isEditing = true;
     this.editingTransaction = { ...transaction };
     this.newTransaction = { ...transaction };
+  }
+
+  isLatestTransaction(transaction: Transaction): boolean {
+    if (transaction.isLatestVersion !== undefined) {
+      return transaction.isLatestVersion;
+    }
+    return false;
   }
 
   cancelEdit(): void {

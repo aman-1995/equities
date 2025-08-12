@@ -107,6 +107,38 @@
   }
 }
 
+// Styles for transaction history table
+:host ::ng-deep {
+  .p-datatable {
+    .p-button.p-button-secondary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .p-badge.p-badge-warning {
+      background-color: var(--orange-500);
+      color: white;
+    }
+  }
+}
+
+.history-info {
+  background: var(--surface-100);
+  border: 1px solid var(--surface-200);
+  border-radius: var(--border-radius);
+  padding: 0.75rem;
+  
+  p {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    
+    i {
+      color: var(--primary-color);
+    }
+  }
+}
+
 .form {
   .form-row {
     display: grid;

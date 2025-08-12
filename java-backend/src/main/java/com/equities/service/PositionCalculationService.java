@@ -30,10 +30,19 @@ public class PositionCalculationService {
         log.info("Processing transaction: Trade={}, Security={}, Qty={}", 
                 transaction.getTradeId(), transaction.getSecurityCode(), transaction.getQuantity());
 
+        boolean isEdit = false;
+        String affectedSecurity = null;
+
         // For new transactions, transactionId will be null and will be auto-generated
         if (transaction.getTransactionId() != null && transactionRepository.existsByTransactionId(transaction.getTransactionId())) {
-            // Update existing transaction
+            // Update existing transaction - validate it's the latest version
             Transaction existing = transactionRepository.findByTransactionId(transaction.getTransactionId()).orElseThrow();
+            validateTransactionEdit(existing);
+            
+            // Store the affected security for recalculation
+            affectedSecurity = existing.getSecurityCode();
+            isEdit = true;
+            
             existing.setTradeId(transaction.getTradeId());
             existing.setVersion(transaction.getVersion());
             existing.setSecurityCode(transaction.getSecurityCode());
@@ -49,7 +58,12 @@ public class PositionCalculationService {
             transactionRepository.save(transaction);
         }
 
-        return recalculatePositionsDelta();
+        // For edits, we need to recalculate positions for the affected security
+        if (isEdit) {
+            return recalculatePositionsForSecurity(affectedSecurity);
+        } else {
+            return recalculatePositionsDelta();
+        }
     }
 
     @Transactional
@@ -74,7 +88,8 @@ public class PositionCalculationService {
     }
 
     public List<Transaction> getAllTransactions() {
-        return transactionRepository.findAll();
+        List<Transaction> transactions = transactionRepository.findAll();
+        return populateLatestVersionFlags(transactions);
     }
 
     @Transactional
@@ -186,6 +201,83 @@ public class PositionCalculationService {
     private Long generateNextTransactionId() {
         Long maxTransactionId = transactionRepository.findMaxTransactionId().orElse(0L);
         return maxTransactionId + 1;
+    }
+
+    private void validateTransactionEdit(Transaction transaction) {
+        Long tradeId = transaction.getTradeId();
+        Optional<Transaction> latestTransaction = transactionRepository.findLatestTransactionByTradeId(tradeId);
+        
+        if (latestTransaction.isPresent()) {
+            Transaction latest = latestTransaction.get();
+            if (!latest.getTransactionId().equals(transaction.getTransactionId())) {
+                throw new TransactionEditException(
+                    String.format("Cannot edit transaction %d (version %d) for trade %d. " +
+                                "Only the latest transaction version %d can be edited.",
+                                transaction.getTransactionId(), transaction.getVersion(), 
+                                tradeId, latest.getVersion())
+                );
+            }
+        }
+    }
+
+    private List<Transaction> populateLatestVersionFlags(List<Transaction> transactions) {
+        if (transactions.isEmpty()) {
+            return transactions;
+        }
+
+        // Group transactions by trade ID
+        Map<Long, List<Transaction>> transactionsByTrade = transactions.stream()
+                .collect(Collectors.groupingBy(Transaction::getTradeId));
+
+        // For each trade, find the latest version and mark it
+        for (List<Transaction> tradeTransactions : transactionsByTrade.values()) {
+            if (tradeTransactions.isEmpty()) {
+                continue;
+            }
+
+            // Find the transaction with the highest version for this trade
+            Transaction latestTransaction = tradeTransactions.stream()
+                    .max(Comparator.comparingInt(Transaction::getVersion))
+                    .orElse(null);
+
+            if (latestTransaction != null) {
+                // Mark all transactions in this trade with their latest version status
+                for (Transaction transaction : tradeTransactions) {
+                    transaction.setIsLatestVersion(
+                        transaction.getTransactionId().equals(latestTransaction.getTransactionId())
+                    );
+                }
+            }
+        }
+
+        return transactions;
+    }
+
+    private List<Position> recalculatePositionsForSecurity(String securityCode) {
+        // Get all trades that affect this security
+        List<Long> relevantTradeIds = transactionRepository.findTradeIdsBySecurityCodes(List.of(securityCode));
+        
+        // Get all transactions for relevant trades
+        List<Transaction> relevantTransactions = transactionRepository.findTransactionsByTradeIds(relevantTradeIds);
+        
+        // Get current positions
+        Map<String, Integer> currentPositions = getAllPositions().stream()
+                .collect(Collectors.toMap(Position::getSecurityCode, Position::getQuantity));
+        
+        // Reset the affected security
+        currentPositions.put(securityCode, 0);
+        
+        // Group transactions by trade ID and process each trade
+        Map<Long, List<Transaction>> transactionsByTrade = relevantTransactions.stream()
+                .collect(Collectors.groupingBy(Transaction::getTradeId));
+        
+        for (List<Transaction> tradeTransactions : transactionsByTrade.values()) {
+            processTradeForPositions(tradeTransactions, currentPositions);
+        }
+        
+        updatePositionsInDatabase(currentPositions);
+        
+        return getAllPositions();
     }
 
     private void updatePositionsInDatabase(Map<String, Integer> positionMap) {

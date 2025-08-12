@@ -232,6 +232,11 @@
                              transaction.action === 'UPDATE' ? 'p-badge-warning' : 'p-badge-danger'">
                 {{ transaction.action }}
               </span>
+              <span *ngIf="isLatestTransaction(transaction)" 
+                    class="p-badge p-badge-success ml-2" 
+                    style="font-size: 0.7rem;">
+                Latest
+              </span>
             </td>
             <td>
               <span class="p-badge" 
@@ -242,11 +247,17 @@
             <td>
               <p-button 
                 icon="pi pi-pencil" 
-                severity="primary" 
+                [severity]="isLatestTransaction(transaction) ? 'primary' : 'secondary'"
                 size="small"
+                [disabled]="!isLatestTransaction(transaction)"
                 (onClick)="editTransaction(transaction)"
-                pTooltip="Edit Transaction">
+                [pTooltip]="isLatestTransaction(transaction) ? 'Edit Transaction' : 'Only latest transaction version can be edited'">
               </p-button>
+              <span *ngIf="!isLatestTransaction(transaction)" 
+                    class="p-badge p-badge-warning ml-2" 
+                    style="font-size: 0.7rem;">
+                History
+              </span>
             </td>
           </tr>
         </ng-template>

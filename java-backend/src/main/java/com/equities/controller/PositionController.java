@@ -4,8 +4,10 @@ import com.equities.model.Position;
 import com.equities.model.ProcessingState;
 import com.equities.model.Transaction;
 import com.equities.service.PositionCalculationService;
+import com.equities.service.TransactionEditException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -75,5 +77,11 @@ public class PositionController {
         log.info("Forcing full recalculation via REST API");
         List<Position> positions = positionCalculationService.forceFullRecalculation();
         return ResponseEntity.ok(positions);
+    }
+
+    @ExceptionHandler(TransactionEditException.class)
+    public ResponseEntity<String> handleTransactionEditException(TransactionEditException e) {
+        log.warn("Transaction edit validation failed: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
 } 
